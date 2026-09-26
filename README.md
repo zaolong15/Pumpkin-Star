@@ -18,7 +18,7 @@
 ## 快速开始
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/zaolong15/Pumpkin-Star
 ```
 
 1. 打开 `edge://extensions/`（Chrome 用 `chrome://extensions/`）
