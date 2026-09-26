@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pumpkin Star — 网页智能体",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "能看懂网页、替你点击/填表/翻译/总结/改造页面，会自己积累经验，并支持附件与剪贴板的 AI 智能体。",
   "minimum_chrome_version": "114",
   "permissions": [
@@ -9,7 +9,9 @@
     "storage",
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "optional_permissions": [
     "debugger"

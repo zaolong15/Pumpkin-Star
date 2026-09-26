@@ -8,6 +8,17 @@ import { MSG, DEFAULT_SETTINGS } from './shared/messages.js';
 import { addUsage, getUsage, resetAll, resetSession, addTaskRecord } from './shared/usage.js';
 import { supportsBalanceQuery, normalizeBalance } from './shared/usage.js';
 import {
+  listConversations,
+  getConversation,
+  createConversation,
+  saveConversation,
+  renameConversation,
+  deleteConversation,
+  clearConversations,
+  conversationStats,
+  lastConversationId,
+} from './shared/conversations.js';
+import {
   listSkills,
   addSkill,
   addManySkills,
@@ -896,6 +907,37 @@ const handlers = {
     return { ok: true };
   },
 
+  // ---- 标签页 ----
+  [MSG.OPEN_TAB]: async (msg) => {
+    const tab = await chrome.tabs.create({
+      url: msg.url && msg.url !== 'about:blank' ? msg.url : undefined,
+      active: msg.focus !== false,
+    });
+    // 给页面一点加载时间，这样后续操作能立刻接上
+    if (msg.focus !== false && msg.url && msg.url !== 'about:blank') {
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return { ok: true, tabId: tab.id, url: tab.pendingUrl || tab.url, focused: msg.focus !== false };
+  },
+
+  // ---- 对话历史 ----
+  [MSG.CONV_LIST]: async () => ({ items: await listConversations(), stats: await conversationStats() }),
+  [MSG.CONV_CREATE]: () => createConversation(),
+  [MSG.CONV_GET]: async (msg) => getConversation(msg.id),
+  [MSG.CONV_SAVE]: async (msg) => saveConversation(msg.id, msg.messages),
+  [MSG.CONV_RENAME]: async (msg) => renameConversation(msg.id, msg.title),
+  [MSG.CONV_DELETE]: async (msg) => deleteConversation(msg.id),
+  [MSG.CONV_CLEAR]: () => clearConversations(),
+
+  // ---- 真实输入模式 ----
+  [MSG.CDP_DETACH]: async () => {
+    const tab = await activeTab().catch(() => null);
+    if (tab?.id) await cdpDetach(tab.id);
+    // 全部断开（切换标签页后可能残留）
+    for (const id of [...cdpAttached]) await cdpDetach(id);
+    return { detached: true };
+  },
+
   // ---- 余额 ----
   [MSG.BALANCE_GET]: async (msg) => {
     try {
@@ -949,6 +991,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       // 侧边栏来取暂存的悬浮窗指令
       sendResponse({ ok: true, task: pendingFloat });
       pendingFloat = null;
+      return true;
+    case 'conv/last-id':
+      lastConversationId().then(
+        (id) => sendResponse({ ok: true, data: id }),
+        () => sendResponse({ ok: true, data: null }),
+      );
       return true;
     case 'evolution/context':
       evolutionContext(msg.task).then(

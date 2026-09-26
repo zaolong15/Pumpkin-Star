@@ -1,4 +1,8 @@
-# Pumpkin Star 隐私政策
+---
+layout: default
+title: Pumpkin Star 隐私政策
+---
+
 
 **最后更新：2026 年 2 月**
 
@@ -199,7 +203,7 @@ OpenAI 接口协议的服务——包括完全本地运行、不联网的模型�
 
 如有隐私相关问题，请通过本项目的 GitHub 仓库提交 Issue：
 
-**https://github.com/zaolong15/Pumpkin-Star/issues**
+**https://github.com/&lt;your-username&gt;/pumpkin-star/issues**
 
 ---
 

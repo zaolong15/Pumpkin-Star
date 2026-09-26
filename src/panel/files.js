@@ -211,15 +211,63 @@ export async function chooseOutputDir() {
 }
 
 /** 取回已保存的目录句柄（不弹选择框）。 */
+/**
+ * 取回已保存的目录句柄。**只查询权限，不申请**。
+ *
+ * 为什么不在里面申请权限：requestPermission() 需要【瞬态用户激活】，
+ * 非手势路径调用会抛 SecurityError。而这个函数会被 Agent 自动触发
+ * 的路径调用（如打开文件弹窗时刷新状态），在里面申请就会把面板搞崩。
+ *
+ * 需要权限时请改用 ensureOutputDir()（只在用户点击流程里调用）。
+ *
+ * @returns {Promise<{dir: FileSystemDirectoryHandle|null, reason?: string}>}
+ */
 export async function getOutputDir() {
-  const handle = await idbGet(DIR_KEY);
-  if (!handle) return null;
-  // 浏览器可能降级了权限，这里主动确认一次
-  const perm = await handle.queryPermission({ mode: 'readwrite' });
-  if (perm === 'granted') return handle;
-  // 没权限就尝试重新申请（如果这次调用源自用户手势，会成功）
-  const asked = await handle.requestPermission({ mode: 'readwrite' });
-  return asked === 'granted' ? handle : null;
+  let handle;
+  try {
+    handle = await idbGet(DIR_KEY);
+  } catch (err) {
+    return { dir: null, reason: `读取目录授权失败：${err?.message || err}` };
+  }
+  if (!handle) return { dir: null, reason: '还没有选择输出文件夹' };
+
+  try {
+    const perm = await handle.queryPermission({ mode: 'readwrite' });
+    if (perm === 'granted') return { dir: handle };
+    return { dir: null, reason: '该文件夹的写入权限已失效，需要重新授权' };
+  } catch (err) {
+    return { dir: null, reason: `无法确认文件夹权限：${err?.message || err}` };
+  }
+}
+
+/**
+ * 取回目录并在必要时申请权限。
+ * **只能在用户手势（如点击）里调用**，否则会抛 SecurityError。
+ *
+ * @returns {Promise<{dir: FileSystemDirectoryHandle|null, reason?: string}>}
+ */
+export async function ensureOutputDir() {
+  const { dir, reason } = await getOutputDir();
+  if (dir) return { dir };
+
+  let handle;
+  try {
+    handle = await idbGet(DIR_KEY);
+  } catch {
+    return { dir: null, reason: reason || '读取目录授权失败' };
+  }
+  if (!handle) return { dir: null, reason: '还没有选择输出文件夹' };
+
+  try {
+    const asked = await handle.requestPermission({ mode: 'readwrite' });
+    if (asked === 'granted') return { dir: handle };
+    return { dir: null, reason: '用户未授予该文件夹的写入权限' };
+  } catch (err) {
+    return {
+      dir: null,
+      reason: `申请权限失败（可能不是由点击触发）：${err?.message || err}`,
+    };
+  }
 }
 
 /** 忘记已选的目录。 */
@@ -234,8 +282,9 @@ export async function forgetOutputDir() {
  * @param {string} content
  */
 export async function writeToOutputDir(filename, content) {
-  const dir = await getOutputDir();
-  if (!dir) throw new Error('尚未授权输出文件夹，请先在设置里选择');
+  // 这个函数只会由"保存"按钮触发，属于用户手势，可以申请权限
+  const { dir, reason } = await ensureOutputDir();
+  if (!dir) throw new Error(reason || '尚未授权输出文件夹，请先选择');
 
   const name = sanitizeFilename(filename);
   const ext = extOf(name);

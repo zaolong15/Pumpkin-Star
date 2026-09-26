@@ -14,6 +14,12 @@
         <span class="dot" id="statusDot" title="就绪"></span>
       </div>
       <div class="actions">
+        <button id="btnConvs" class="icon-btn" title="对话历史" aria-label="对话历史">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" />
+            <path d="M8 11h8M8 15h5" />
+          </svg>
+        </button>
         <button id="btnEvolve" class="icon-btn" title="技能与自我规则" aria-label="技能与规则">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
@@ -95,7 +101,8 @@
         </div>
         <div class="hint-right">
           <span id="tokenHint" class="token-hint" title="本次会话累计 token"></span>
-          <button id="btnClear" class="link">清空对话</button>
+          <button id="btnNewConv" class="link">新对话</button>
+          <button id="btnClear" class="link">清空当前</button>
         </div>
       </div>
     </footer>
@@ -295,16 +302,20 @@
                 <small>网页右下角的小助手，可快捷下指令、一键撤销改动</small>
               </div>
             </label>
-            <label class="switch-row">
-              <input type="checkbox" id="sCdp" />
+            <div class="switch-row cdp-row">
               <div>
                 <strong>真实输入模式（CDP）</strong>
                 <small>
                   用浏览器调试协议发送点击与按键，事件带 isTrusted 标记，能过部分风控网站。
-                  代价：需要额外授权，且页面顶部会出现「正在调试」横幅。默认关闭。
+                  代价：需要额外授权，且页面顶部会出现「正在调试」横幅。
                 </small>
+                <div class="cdp-actions">
+                  <button id="btnCdpEnable" class="ghost small-btn" type="button">启用</button>
+                  <button id="btnCdpDisable" class="ghost small-btn" type="button" hidden>关闭</button>
+                  <span id="cdpHint" class="field-hint inline"></span>
+                </div>
               </div>
-            </label>
+            </div>
           </div>
           <p class="tip">
             说明：浏览器扩展**无法移动你的系统鼠标或键盘** —— 没有这样的 API，
@@ -345,6 +356,22 @@
         <div class="modal-actions">
           <button id="memClearAuto" class="ghost danger">清除自动记忆</button>
           <button id="memClose" class="primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对话历史 -->
+    <div id="convModal" class="modal" hidden>
+      <div class="modal-card wide">
+        <h2>对话历史 <span id="convStats" class="stats"></span></h2>
+        <div class="conv-actions">
+          <button id="convNew" class="primary small" type="button">＋ 新建对话</button>
+          <input id="convSearch" type="text" placeholder="搜索标题…" />
+        </div>
+        <div id="convList" class="conv-list"></div>
+        <div class="modal-actions">
+          <button id="convClearAll" class="ghost danger">清空全部</button>
+          <button id="convClose" class="primary">关闭</button>
         </div>
       </div>
     </div>

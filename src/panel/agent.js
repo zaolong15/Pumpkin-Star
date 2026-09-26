@@ -156,6 +156,25 @@ export const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'new_tab',
+      description:
+        '在新标签页打开一个网址（可选：打开后切换过去）。当前页面保持不变。用户说「新开一个标签页」「另开一个窗口查」时用它。注意：查看新标签页的内容需要先切换过去。',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: '要打开的网址，留空则开空白页' },
+          focus: {
+            type: 'boolean',
+            description: '是否立刻切换到新标签页，默认 true。若想让当前任务继续操作原页面则传 false',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'go_back',
       description: '返回上一页。',
       parameters: { type: 'object', properties: {}, required: [] },
@@ -377,6 +396,55 @@ export const TOOLS = [
 
 
 /* ============================================================
+   工具并行执行
+   ------------------------------------------------------------
+   模型经常一轮返回多个互不依赖的调用（比如"隐藏 A、隐藏 B、注入 CSS"）。
+   原来逐个 await，3 个动作各等 600ms 就是 1.8 秒。
+   实测：这些动作之间没有先后依赖，并行执行能压到最慢的那个（约 600ms）。
+
+   哪些能并行：
+     - 纯读取（snapshot/outline/read_page）：彼此独立
+     - 页面改造（hide/show/set_text/set_style/add_style）：作用于不同元素时独立
+   哪些必须串行：
+     - finish：要立刻终止循环
+     - click / navigate / new_tab / go_back：会改变页面，后续动作依赖新状态
+     - type / select：有输入焦点依赖
+     - wait：本身就是为了等待
+     - scroll：会改变元素位置，影响后续点击坐标
+
+   保守起见：**只在一轮里全是"可并行"动作时才并行**，
+   只要有一个串行动作，整轮就走串行 —— 这样不会因为打乱顺序引发难以排查的问题。
+   ============================================================ */
+
+/** 这些动作彼此独立，可以并行执行。 */
+const PARALLEL_SAFE = new Set([
+  'snapshot',
+  'outline',
+  'read_page',
+  'hide',
+  'show',
+  'set_text',
+  'set_style',
+  'add_style',
+  'remove_element',
+  'inject_js',
+  'highlight',
+  'remember',
+  'export_file',
+  'copy_to_clipboard',
+  'read_clipboard',
+]);
+
+/** 一轮是否整体可并行。 */
+function canRunParallel(toolCalls) {
+  if (!toolCalls || toolCalls.length < 2) return false;
+  return toolCalls.every((c) => {
+    const name = c.function?.name;
+    return name && PARALLEL_SAFE.has(name);
+  });
+}
+
+/* ============================================================
    工具分组：减少无关工具调用
    ------------------------------------------------------------
    实测结论：模型往返是主要耗时（每次 4 秒起），而每次往返它都要
@@ -394,7 +462,7 @@ const TOOL_GROUPS = {
   // 操作：点击、填表、跨页导航
   act: [
     'snapshot', 'read_page', 'outline', 'click', 'click_at', 'hover', 'move_mouse',
-    'type_text', 'select_option', 'scroll', 'navigate', 'go_back', 'wait',
+    'type_text', 'select_option', 'scroll', 'navigate', 'new_tab', 'go_back', 'wait',
     'highlight', 'copy_to_clipboard', 'read_clipboard', 'export_file', 'finish',
   ],
 
@@ -530,6 +598,8 @@ function toAction(name, args) {
       return { type: 'scroll', amount: args.amount };
     case 'navigate':
       return { type: 'navigate', url: args.url };
+    case 'new_tab':
+      return { type: 'new_tab', url: args.url };
     case 'go_back':
       return { type: 'back' };
     case 'highlight':
@@ -788,17 +858,13 @@ export async function runAgent({ task, history = [], settings = DEFAULT_SETTINGS
       return { summary: reply.content, steps, usage: usageTotal, memoryCount, skillCount, ruleCount };
     }
 
-    for (const call of reply.toolCalls) {
-      if (isCancelled?.()) return { aborted: true, steps, usage: usageTotal };
+    // ── 决定并行还是串行 ──
+    const parallel = canRunParallel(reply.toolCalls);
 
+    /** 执行单个工具调用，返回 { call, name, args, result }。 */
+    const runOne = async (call) => {
       const name = call.function?.name;
       const args = safeParse(call.function?.arguments);
-
-      if (name === 'finish') {
-        onEvent?.({ type: 'done', summary: args.summary || '完成。' });
-        return { summary: args.summary, steps, usage: usageTotal, memoryCount, skillCount, ruleCount };
-      }
-
       onEvent?.({ type: 'tool', name, args });
 
       let result;
@@ -809,12 +875,7 @@ export async function runAgent({ task, history = [], settings = DEFAULT_SETTINGS
           result = compactOutline(await callBg(MSG.GET_OUTLINE));
         } else if (name === 'read_page') {
           const data = await callBg(MSG.GET_PAGE_TEXT);
-          result = {
-            url: data.url,
-            title: data.title,
-            truncated: data.truncated,
-            text: data.text,
-          };
+          result = { url: data.url, title: data.title, truncated: data.truncated, text: data.text };
         } else if (name === 'export_file') {
           // 文件写入需要 DOM（Blob / File System Access），只能在面板里做。
           // 这里把内容交给界面，由用户确认写到哪儿 —— 不静默写盘。
@@ -831,7 +892,6 @@ export async function runAgent({ task, history = [], settings = DEFAULT_SETTINGS
             chars: String(args.content || '').length,
           };
         } else if (name === 'remember') {
-          // 记忆库关闭时静默跳过，避免模型反复尝试
           if (settings.memoryEnabled === false) {
             result = { ok: true, note: '记忆库已关闭，本条未保存' };
           } else {
@@ -844,21 +904,71 @@ export async function runAgent({ task, history = [], settings = DEFAULT_SETTINGS
         } else if (ACTIONS.includes(toAction(name, args)?.type)) {
           const action = toAction(name, args);
           result = await callBg(MSG.EXEC_ACTION, { action });
+          if (result?.__openTab !== undefined) {
+            const focus = args.focus !== false;
+            result = await callBg(MSG.OPEN_TAB, { url: result.__openTab, focus });
+          }
         } else {
           result = { ok: false, error: `不支持的工具 ${name}` };
         }
       } catch (err) {
         result = { ok: false, error: err.message };
       }
+      return { call, name, args, result };
+    };
 
-      steps.push({ step: i + 1, tool: name, args, result });
-      onEvent?.({ type: 'result', name, result });
+    if (parallel) {
+      // 并行执行（顺序无关的动作）。用 Promise.all 保留与 toolCalls 一致的顺序。
+      const done = await Promise.all(
+        reply.toolCalls.map((c) => {
+          const name = c.function?.name;
+          const args = safeParse(c.function?.arguments);
+          if (name === 'finish') {
+            return { call: c, name, args, result: null, isFinish: true };
+          }
+          return runOne(c);
+        }),
+      );
 
-      messages.push({
-        role: 'tool',
-        tool_call_id: call.id,
-        content: JSON.stringify(result).slice(0, 20000),
-      });
+      // finish 始终优先处理
+      const fin = done.find((d) => d.isFinish);
+      if (fin) {
+        onEvent?.({ type: 'done', summary: fin.args.summary || '完成。' });
+        return { summary: fin.args.summary, steps, usage: usageTotal, memoryCount, skillCount, ruleCount };
+      }
+
+      for (const d of done) {
+        steps.push({ step: i + 1, tool: d.name, args: d.args, result: d.result });
+        onEvent?.({ type: 'result', name: d.name, result: d.result });
+        messages.push({
+          role: 'tool',
+          tool_call_id: d.call.id,
+          content: JSON.stringify(d.result).slice(0, 20000),
+        });
+      }
+    } else {
+      // 串行执行（含会改变页面状态的动作）
+      for (const call of reply.toolCalls) {
+        if (isCancelled?.()) return { aborted: true, steps, usage: usageTotal };
+
+        const name = call.function?.name;
+        const args = safeParse(call.function?.arguments);
+
+        if (name === 'finish') {
+          onEvent?.({ type: 'done', summary: args.summary || '完成。' });
+          return { summary: args.summary, steps, usage: usageTotal, memoryCount, skillCount, ruleCount };
+        }
+
+        const d = await runOne(call);
+        steps.push({ step: i + 1, tool: d.name, args: d.args, result: d.result });
+        onEvent?.({ type: 'result', name: d.name, result: d.result });
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(d.result).slice(0, 20000),
+        });
+      }
     }
   }
 

@@ -1862,3 +1862,127 @@ input[type='range']::-webkit-slider-thumb:hover {
   border-color: color-mix(in srgb, var(--ok) 40%, transparent);
   color: var(--ok);
 }
+
+/* CDP 开关行（不是 label，因为里面是按钮不是 checkbox） */
+.switch-row.cdp-row {
+  cursor: default;
+}
+.switch-row.cdp-row:hover {
+  background: transparent;
+}
+.cdp-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+.field-hint.inline {
+  margin-top: 0;
+  margin-left: 2px;
+}
+
+/* ============================================================
+   对话历史
+   ============================================================ */
+.conv-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.conv-actions .small {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-on);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.conv-actions #convSearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-input);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.conv-actions #convSearch:focus {
+  border-color: var(--accent-line);
+}
+
+.conv-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+}
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background var(--speed) var(--ease);
+}
+.conv-item:last-child {
+  border-bottom: 0;
+}
+.conv-item:hover {
+  background: var(--bg-hover);
+}
+.conv-item.active {
+  background: var(--accent-soft);
+  border-left: 2px solid var(--accent);
+  padding-left: 9px;
+}
+.conv-item .info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.conv-item .title {
+  display: block;
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conv-item .meta {
+  display: block;
+  font-size: calc(var(--fs-sm) - 1.5px);
+  color: var(--fg-faint);
+  margin-top: 2px;
+}
+.conv-item .ops {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.conv-item .ops button {
+  border: 0;
+  background: none;
+  color: var(--fg-faint);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 4px;
+  transition: color var(--speed) var(--ease), background var(--speed) var(--ease);
+}
+.conv-item .ops button:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.conv-item .ops button.del:hover {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+}
+.conv-item .ops button.renaming {
+  color: var(--accent);
+}

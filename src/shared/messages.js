@@ -34,8 +34,23 @@ export const MSG = {
   USAGE_ADD: 'usage/add',
   USAGE_RESET: 'usage/reset',
 
+  // 标签页
+  OPEN_TAB: 'tab/open',
+
+  // 对话历史
+  CONV_LIST: 'conv/list',
+  CONV_CREATE: 'conv/create',
+  CONV_GET: 'conv/get',
+  CONV_SAVE: 'conv/save',
+  CONV_RENAME: 'conv/rename',
+  CONV_DELETE: 'conv/delete',
+  CONV_CLEAR: 'conv/clear',
+
   // 余额
   BALANCE_GET: 'balance/get',
+
+  // 真实输入模式
+  CDP_DETACH: 'cdp/detach',
 
   // 技能库（自进化）
   SKILL_LIST: 'skill/list',
@@ -81,6 +96,7 @@ export const ACTIONS = [
   'select',
   'scroll',
   'navigate',
+  'new_tab',
   'back',
   'wait',
   'extract',

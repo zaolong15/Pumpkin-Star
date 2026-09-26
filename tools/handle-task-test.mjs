@@ -131,6 +131,13 @@ const helpers = `
   // handleTask 会读这两个（附件与剪贴板上下文），测试里给空值
   let attachments = [];
   let clipContext = '';
+  // 对话历史相关：handleTask 会记录消息并防抖保存
+  let renderedMessages = [];
+  const rememberMessage = (role, content, kind) => {
+    renderedMessages.push({ role, content: String(content ?? ''), kind: kind || 'text' });
+  };
+  const scheduleConvSave = () => {};
+  const flushConvSave = async () => {};
   const renderFiles = () => '';
   const summarizeFiles = () => '';
   const renderAttachBar = () => {};

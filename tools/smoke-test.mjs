@@ -574,11 +574,13 @@ console.log('\n[13] 模型列表与 CDP');
   const panelHtml2 = await readFile(path.join(root, 'src/panel/panel.html'), 'utf8');
   check(panelHtml2.includes('btnFetchModels'), '界面有获取模型列表按钮');
   check(panelHtml2.includes('datalist'), '用 datalist 提供模型下拉候选');
-  check(panelHtml2.includes('sCdp'), '界面有真实输入模式开关');
+  check(panelHtml2.includes('btnCdpEnable'), '界面有真实输入模式启用按钮');
 
   const panelSrc5 = await readFile(path.join(root, 'src/panel/panel.js'), 'utf8');
   check(panelSrc5.includes('permissions.request'), '开启 CDP 时申请权限');
   check(panelSrc5.includes("permissions: ['debugger']"), '申请的正是 debugger 权限');
+  check(panelSrc5.includes('permissions.contains'), '申请前先检查是否已授予');
+  check(panelSrc5.includes("el.btnCdpEnable?.addEventListener('click'"), '用按钮 click 触发放权限（可靠手势）');
 }
 
 // ---------- 16. 省步骤 ----------

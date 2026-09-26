@@ -47,7 +47,18 @@ const el = {
   sSteps: $('sSteps'),
   sMemory: $('sMemory'),
   sFloating: $('sFloating'),
-  sCdp: $('sCdp'),
+  btnConvs: $('btnConvs'),
+  convModal: $('convModal'),
+  convStats: $('convStats'),
+  convList: $('convList'),
+  convNew: $('convNew'),
+  convSearch: $('convSearch'),
+  convClose: $('convClose'),
+  convClearAll: $('convClearAll'),
+  btnNewConv: $('btnNewConv'),
+  btnCdpEnable: $('btnCdpEnable'),
+  btnCdpDisable: $('btnCdpDisable'),
+  cdpHint: $('cdpHint'),
   sSave: $('btnSettingsSave'),
   sCancel: $('btnSettingsCancel'),
   sReset: $('btnSettingsReset'),
@@ -377,7 +388,7 @@ function renderMarkdown(src) {
 
 /* ---------------- 渲染 ---------------- */
 
-function addMessage(role, content, { markdown = false, error = false } = {}) {
+function addMessage(role, content, { markdown = false, error = false, record = true } = {}) {
   document.querySelector('.welcome')?.remove();
   const div = document.createElement('div');
   div.className = `msg ${role}${error ? ' error' : ''}`;
@@ -385,6 +396,12 @@ function addMessage(role, content, { markdown = false, error = false } = {}) {
   else div.textContent = content;
   el.chat.appendChild(div);
   scrollToBottom();
+
+  // 记入对话历史（供切换对话时重建界面）。
+  // record=false 用于临时内容（如加载中的"…"）和错误提示 —— 它们不该被持久化。
+  if (record && !error) {
+    rememberMessage(role, content, markdown ? 'markdown' : 'text');
+  }
   return div;
 }
 
@@ -524,7 +541,9 @@ async function handleTask(task) {
   let replyEl = null;
   let result = null;
   try {
-    addMessage('user', text);
+    // 界面上显示用户输入；历史里记的是原始任务（附件正文不重复存）
+    addMessage('user', text, { record: false });
+    rememberMessage('user', raw || text, 'text');
     el.input.value = '';
     autoGrow();
     el.steps.innerHTML = '';
@@ -533,7 +552,7 @@ async function handleTask(task) {
     sessionTokens = 0;
     setBusy(true);
 
-    replyEl = addMessage('assistant', '…');
+    replyEl = addMessage('assistant', '…', { record: false });
 
     // 附件已经交出去了，清空避免下次任务重复带上
     if (attachments.length || clipContext) {
@@ -715,10 +734,14 @@ function handleAgentEvent(evt, replyEl) {
     case 'result':
       addStepLine(evt.name, evt.args, evt.result);
       break;
-    case 'done':
-      replyEl.innerHTML = renderMarkdown(evt.summary || '完成。');
+    case 'done': {
+      const summary = evt.summary || '完成。';
+      replyEl.innerHTML = renderMarkdown(summary);
+      // 最终答复才算真正的一条对话记录
+      rememberMessage('assistant', summary, 'markdown');
       scrollToBottom();
       break;
+    }
     case 'error':
       // 不在这里删 replyEl：后续还可能继续渲染，统一在收尾处处理
       replyEl.dataset.failed = '1';
@@ -827,10 +850,61 @@ el.fileInput?.addEventListener('change', async (e) => {
 });
 
 // 读剪贴板
+/**
+ * 读取剪贴板文本。
+ *
+ * 直接用 navigator.clipboard.readText() 有两个坑：
+ *   1. 侧边栏文档常常"未聚焦"（焦点在网页上），此时会抛
+ *      NotAllowedError: Document is not focused
+ *   2. 首次调用需要剪贴板权限，用户拒绝或未响应都会失败
+ *
+ * 所以做三级降级：
+ *   a) 直接读（manifest 已声明 clipboardRead，通常够用）
+ *   b) 失败则先尝试聚焦侧边栏再读一次
+ *   c) 再失败则给出明确的、可操作的提示（而不是笼统的"请允许"）
+ */
+async function readClipboardText() {
+  const tryRead = async () => {
+    if (!navigator.clipboard?.readText) {
+      throw new Error('当前环境不支持读取剪贴板');
+    }
+    return navigator.clipboard.readText();
+  };
+
+  try {
+    return await tryRead();
+  } catch (first) {
+    // 聚焦重试：把焦点拉到侧边栏文档上再读
+    try {
+      window.focus();
+      // 让浏览器有机会把焦点切换过来
+      await new Promise((r) => setTimeout(r, 60));
+      return await tryRead();
+    } catch {
+      throw first; // 抛出第一次的错误，信息更贴近真实原因
+    }
+  }
+}
+
+/** 把剪贴板错误翻译成用户能照做的提示。 */
+function clipboardErrorHint(err) {
+  const msg = String(err?.message || err);
+  if (/not focused|Document is not/i.test(msg)) {
+    return '侧边栏没有获得焦点。点一下侧边栏再试，或改用「附加文件」。';
+  }
+  if (/denied|permission/i.test(msg)) {
+    return '浏览器拒绝了剪贴板访问。请在地址栏左侧的站点权限里允许剪贴板，然后重试。';
+  }
+  if (/not supported|不支持/i.test(msg)) {
+    return msg;
+  }
+  return msg;
+}
+
 el.btnClip?.addEventListener('click', async () => {
   el.btnClip.classList.add('busy');
   try {
-    const text = await navigator.clipboard.readText();
+    const text = await readClipboardText();
     if (!text) {
       addMessage('assistant', '剪贴板是空的。');
       return;
@@ -838,11 +912,7 @@ el.btnClip?.addEventListener('click', async () => {
     clipContext = text.slice(0, 50000);
     renderAttachBar();
   } catch (err) {
-    addMessage(
-      'assistant',
-      `读取剪贴板失败：${err?.message || err}。浏览器会要求剪贴板权限，请允许后重试。`,
-      { error: true },
-    );
+    addMessage('assistant', `读取剪贴板失败：${clipboardErrorHint(err)}`, { error: true });
   } finally {
     el.btnClip.classList.remove('busy');
   }
@@ -894,6 +964,267 @@ el.clear.addEventListener('click', () => {
   el.steps.innerHTML = '';
   el.steps.hidden = true;
   location.reload();
+});
+
+/* ---------------- 对话历史 ---------------- */
+
+/**
+ * 当前对话的持久化。
+ *
+ * 三个层次：
+ *   messages  界面上的消息气泡 DOM（用于切回时重建）
+ *   history   发给模型的历史（发给 runAgent 的那个数组）
+ *   convId    当前对话在存储里的 id
+ *
+ * 为什么还要存 messages（DOM 描述）：history 只留最近 16 条用于上下文，
+ * 而界面上应该显示完整对话。所以两者分开存。
+ */
+
+let convId = null;
+/** 界面消息的轻量描述：[{role, content, kind}] */
+let renderedMessages = [];
+
+/** 把一条消息记入渲染描述（供切回时重建）。 */
+function rememberMessage(role, content, kind = 'text') {
+  renderedMessages.push({ role, content: String(content ?? ''), kind });
+  scheduleConvSave();
+}
+
+let convSaveTimer = null;
+/** 防抖保存：连续发消息时不必每条都写一次存储。 */
+function scheduleConvSave() {
+  clearTimeout(convSaveTimer);
+  convSaveTimer = setTimeout(() => {
+    if (!convId) return;
+    callBg(MSG.CONV_SAVE, { id: convId, messages: renderedMessages }).catch(() => {});
+  }, 600);
+}
+
+/** 立即保存（切换对话/关闭前调用）。 */
+async function flushConvSave() {
+  clearTimeout(convSaveTimer);
+  if (!convId) return;
+  try {
+    await callBg(MSG.CONV_SAVE, { id: convId, messages: renderedMessages });
+  } catch {
+    /* 忽略 */
+  }
+}
+
+/** 清空界面上的对话区（回到欢迎态）。 */
+function clearChatUI() {
+  el.chat.textContent = '';
+  const welcome = document.createElement('div');
+  welcome.className = 'welcome';
+  const h1 = document.createElement('h1');
+  h1.textContent = '你好，我是 Pumpkin Star';
+  const p = document.createElement('p');
+  p.textContent = '看懂当前网页，然后点击、填表、翻译、总结、改造页面。';
+  welcome.append(h1, p);
+  el.chat.appendChild(welcome);
+  el.steps.textContent = '';
+  el.steps.hidden = true;
+}
+
+/** 用已保存的消息重建界面。 */
+function rebuildChatUI(messages) {
+  el.chat.textContent = '';
+  el.steps.textContent = '';
+  el.steps.hidden = true;
+
+  if (!messages?.length) {
+    clearChatUI();
+    return;
+  }
+  for (const m of messages) {
+    if (m.kind === 'reasoning') continue; // 推理过程不再展示
+    if (m.role === 'user') {
+      const d = document.createElement('div');
+      d.className = 'msg user';
+      d.textContent = m.content;
+      el.chat.appendChild(d);
+    } else {
+      const d = document.createElement('div');
+      d.className = 'msg assistant';
+      d.innerHTML = renderMarkdown(m.content);
+      el.chat.appendChild(d);
+    }
+  }
+  scrollToBottom();
+}
+
+/** 切到某段对话。 */
+async function openConversation(id) {
+  await flushConvSave();
+  const conv = await callBg(MSG.CONV_GET, { id });
+  if (!conv) {
+    addMessage('assistant', '这段对话已经不存在了。', { error: true });
+    return;
+  }
+  convId = id;
+  renderedMessages = (conv.messages || []).map((m) => ({ ...m }));
+  // history 只保留最近若干条给模型
+  history = renderedMessages
+    .filter((m) => m.kind !== 'reasoning')
+    .slice(-16)
+    .map((m) => ({ role: m.role, content: m.content }));
+  rebuildChatUI(renderedMessages);
+  await renderConvList();
+}
+
+/** 新建对话。 */
+async function newConversation() {
+  await flushConvSave();
+  convId = await callBg(MSG.CONV_CREATE);
+  renderedMessages = [];
+  history = [];
+  sessionTokens = 0;
+  clearChatUI();
+  updateModelHint();
+  await renderConvList();
+  el.input?.focus();
+}
+
+/** 渲染对话列表。 */
+async function renderConvList() {
+  let data;
+  try {
+    data = await callBg(MSG.CONV_LIST);
+  } catch (err) {
+    el.convList.textContent = `读取失败：${err.message}`;
+    return;
+  }
+  if (el.convStats) {
+    el.convStats.textContent = `${data.stats?.count || 0} 段`;
+  }
+
+  const keyword = (el.convSearch?.value || '').trim().toLowerCase();
+  const items = (data.items || []).filter(
+    (c) => !keyword || String(c.title).toLowerCase().includes(keyword),
+  );
+
+  el.convList.textContent = '';
+  if (!items.length) {
+    el.convList.appendChild(
+      emptyHint(keyword ? '没有匹配的对话。' : '还没有对话。点「新建对话」开始。'),
+    );
+    return;
+  }
+
+  for (const c of items) {
+    const row = document.createElement('div');
+    row.className = `conv-item${c.id === convId ? ' active' : ''}`;
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const title = document.createElement('span');
+    title.className = 'title';
+    title.textContent = c.title || '新对话';
+    title.title = c.title || '';
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    const when = new Date(c.updatedAt || c.createdAt || Date.now());
+    const pad = (n) => String(n).padStart(2, '0');
+    meta.textContent = `${c.count || 0} 条 · ${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+    info.append(title, meta);
+
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+
+    const ren = document.createElement('button');
+    ren.type = 'button';
+    ren.title = '重命名';
+    ren.textContent = '✎';
+    ren.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const next = window.prompt('重命名对话', c.title || '');
+      if (next === null) return;
+      try {
+        await callBg(MSG.CONV_RENAME, { id: c.id, title: next });
+        await renderConvList();
+      } catch (err) {
+        addMessage('assistant', `重命名失败：${err.message}`, { error: true });
+      }
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.title = '删除';
+    del.textContent = '×';
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await callBg(MSG.CONV_DELETE, { id: c.id });
+        // 删掉的正好是当前对话 -> 新建一个空的
+        if (c.id === convId) {
+          convId = null;
+          renderedMessages = [];
+          history = [];
+          clearChatUI();
+          convId = await callBg(MSG.CONV_CREATE);
+        }
+        await renderConvList();
+      } catch (err) {
+        addMessage('assistant', `删除失败：${err.message}`, { error: true });
+      }
+    });
+
+    ops.append(ren, del);
+    row.append(info, ops);
+
+    // 点整行切换过去
+    row.addEventListener('click', async () => {
+      if (c.id === convId) {
+        el.convModal.hidden = true;
+        return;
+      }
+      await openConversation(c.id);
+      el.convModal.hidden = true;
+    });
+
+    el.convList.appendChild(row);
+  }
+}
+
+// 打开对话面板
+el.btnConvs?.addEventListener('click', async () => {
+  el.convModal.hidden = false;
+  if (el.convSearch) el.convSearch.value = '';
+  await renderConvList();
+});
+
+el.convClose?.addEventListener('click', async () => {
+  await flushConvSave();
+  el.convModal.hidden = true;
+});
+el.convModal?.addEventListener('click', async (e) => {
+  if (e.target === el.convModal) {
+    await flushConvSave();
+    el.convModal.hidden = true;
+  }
+});
+
+el.convNew?.addEventListener('click', async () => {
+  await newConversation();
+  el.convModal.hidden = true;
+});
+
+el.btnNewConv?.addEventListener('click', newConversation);
+
+el.convSearch?.addEventListener('input', () => renderConvList());
+
+el.convClearAll?.addEventListener('click', async () => {
+  try {
+    await callBg(MSG.CONV_CLEAR);
+    convId = await callBg(MSG.CONV_CREATE);
+    renderedMessages = [];
+    history = [];
+    clearChatUI();
+    await renderConvList();
+  } catch (err) {
+    addMessage('assistant', `清空失败：${err.message}`, { error: true });
+  }
 });
 
 /* ---------------- 页面信息面板 ---------------- */
@@ -1001,7 +1332,7 @@ function openSettings() {
   el.sSteps.value = settings.maxSteps;
   el.sMemory.checked = settings.memoryEnabled !== false;
   el.sFloating.checked = settings.floatingEnabled !== false;
-  el.sCdp.checked = Boolean(settings.cdpEnabled);
+  syncCdpUI(Boolean(settings.cdpEnabled));
   if (el.sEvolution) el.sEvolution.checked = settings.evolutionEnabled !== false;
   if (el.sEvolutionInject) el.sEvolutionInject.checked = settings.evolutionInject !== false;
   if (el.sFileOutput) el.sFileOutput.checked = Boolean(settings.fileOutputEnabled);
@@ -1123,28 +1454,80 @@ async function fetchModelList() {
 
 el.btnFetchModels.addEventListener('click', fetchModelList);
 
-/* ---------- 真实输入模式（CDP）的权限申请 ---------- */
+/* ---------- 真实输入模式（CDP） ---------- */
 
 /**
- * debugger 是 optional_permissions，必须在用户手势里申请。
- * 勾选时立刻弹权限框，用户拒绝就把开关拨回去。
+ * 申请 debugger 权限并启用 CDP。
+ *
+ * 为什么用明确的按钮，而不是 checkbox 的 change 事件：
+ *   chrome.permissions.request() 要求"瞬态用户激活"。
+ *   change 事件在侧边栏里可能不被认作有效手势（实测点击开关没反应），
+ *   而 button 的 click 是最可靠的手势来源。
+ *
+ * 另外把"授权"和"启用"合成一步：点一次就完成，不需要先勾选再保存。
  */
-el.sCdp.addEventListener('change', async () => {
-  if (!el.sCdp.checked) return; // 关闭不需要权限
+async function enableCdp() {
+  if (el.cdpHint) el.cdpHint.textContent = '正在申请权限…';
+  if (el.btnCdpEnable) el.btnCdpEnable.disabled = true;
   try {
-    const granted = await chrome.permissions.request({ permissions: ['debugger'] });
+    // 必须先判断是否已授予：对已在 permissions 里的权限调用 request 会抛错
+    const already = await chrome.permissions.contains({ permissions: ['debugger'] });
+    const granted = already
+      ? true
+      : await chrome.permissions.request({ permissions: ['debugger'] });
+
     if (!granted) {
-      el.sCdp.checked = false;
-      addMessage(
-        'assistant',
-        '没有获得调试权限，已保持默认模式。默认模式的点击对绝大多数网站够用，只是风控严格的站点可能不响应。',
-      );
+      if (el.cdpHint) el.cdpHint.textContent = '未获得授权，保持默认模式';
+      if (el.btnCdpEnable) el.btnCdpEnable.disabled = false;
+      return false;
     }
+
+    settings = await callBg(MSG.SET_SETTINGS, { settings: { cdpEnabled: true } });
+    syncCdpUI(true);
+    if (el.cdpHint) el.cdpHint.textContent = '已启用。被操作的页面顶部会出现调试横幅。';
+    return true;
   } catch (err) {
-    el.sCdp.checked = false;
-    addMessage('assistant', `申请权限失败：${err.message}`, { error: true });
+    if (el.cdpHint) {
+      el.cdpHint.textContent = `申请失败：${err?.message || err}（请点「启用」按钮本身，而不是用键盘）`;
+    }
+    if (el.btnCdpEnable) el.btnCdpEnable.disabled = false;
+    return false;
   }
-});
+}
+
+/** 关闭 CDP。保留已授予的权限（只是不再使用），避免反复弹授权框。 */
+async function disableCdp() {
+  try {
+    settings = await callBg(MSG.SET_SETTINGS, { settings: { cdpEnabled: false } });
+    syncCdpUI(false);
+    if (el.cdpHint) el.cdpHint.textContent = '';
+    // 顺带断开可能还挂着的调试器
+    try {
+      await callBg(MSG.CDP_DETACH);
+    } catch {
+      /* 没有附着过也正常 */
+    }
+    return true;
+  } catch (err) {
+    if (el.cdpHint) el.cdpHint.textContent = `关闭失败：${err?.message || err}`;
+    return false;
+  }
+}
+
+/** 同步 CDP 相关 UI。 */
+function syncCdpUI(enabled) {
+  if (el.btnCdpEnable) {
+    el.btnCdpEnable.hidden = enabled;
+    el.btnCdpEnable.disabled = false;
+  }
+  if (el.btnCdpDisable) el.btnCdpDisable.hidden = !enabled;
+  if (el.cdpHint && !enabled && el.cdpHint.textContent.startsWith('已启用')) {
+    el.cdpHint.textContent = '';
+  }
+}
+
+el.btnCdpEnable?.addEventListener('click', enableCdp);
+el.btnCdpDisable?.addEventListener('click', disableCdp);
 
 // 取消：把预览回滚成已保存的外观
 el.sCancel.addEventListener('click', () => {
@@ -1177,7 +1560,6 @@ el.sSave.addEventListener('click', async () => {
       maxSteps: Math.max(1, Math.min(30, Number(el.sSteps.value) || 12)),
       memoryEnabled: el.sMemory.checked,
       floatingEnabled: el.sFloating.checked,
-      cdpEnabled: el.sCdp.checked,
       evolutionEnabled: el.sEvolution ? el.sEvolution.checked : true,
       evolutionInject: el.sEvolutionInject ? el.sEvolutionInject.checked : true,
       fileOutputEnabled: el.sFileOutput ? el.sFileOutput.checked : false,
@@ -1536,6 +1918,29 @@ setInterval(pollFloatTask, 1500);
   syncAppearanceUI();
   updateModelHint();
   autoGrow();
+
+  // 恢复上次的对话；没有就新建一个空的
+  try {
+    const id = await callBg('conv/last-id').catch(() => null);
+    if (id) {
+      const conv = await callBg(MSG.CONV_GET, { id });
+      if (conv) {
+        convId = id;
+        renderedMessages = (conv.messages || []).map((m) => ({ ...m }));
+        history = renderedMessages
+          .filter((m) => m.kind !== 'reasoning')
+          .slice(-16)
+          .map((m) => ({ role: m.role, content: m.content }));
+        if (renderedMessages.length) rebuildChatUI(renderedMessages);
+      }
+    }
+    if (!convId) {
+      convId = await callBg(MSG.CONV_CREATE);
+    }
+  } catch {
+    // 恢复失败不影响使用，静默跳过
+  }
+
   if (!settings.apiKey) {
     addMessage('assistant', '第一次使用：点右上角 ⚙ 填写 API Base URL、API Key 和模型名，然后就能让我操作网页了。');
   }
@@ -2011,21 +2416,28 @@ let outputDir = null;
 
 /** 刷新目录状态显示。 */
 async function refreshFileDir() {
-  try {
-    outputDir = await getOutputDir();
-  } catch {
-    outputDir = null;
-  }
   const box = el.fileDirBox;
   if (!box) return;
-  if (outputDir) {
-    box.classList.add('ok');
-    el.fileDirName.textContent = outputDir.name;
-    el.fileDirHint.textContent = '已授权，可以写入文件了';
-  } else {
+  try {
+    // getOutputDir 只查询权限，不会申请 —— 所以在这里调用是安全的，
+    // 即便它是被 Agent 自动打开弹窗触发的（非用户手势）。
+    const { dir, reason } = await getOutputDir();
+    outputDir = dir;
+    if (dir) {
+      box.classList.add('ok');
+      el.fileDirName.textContent = dir.name;
+      el.fileDirHint.textContent = '已授权，可以写入文件了';
+    } else {
+      box.classList.remove('ok');
+      el.fileDirName.textContent = '未选择目录';
+      el.fileDirHint.textContent = reason || '选一个本地文件夹，之后写入的文件都会放在那里';
+    }
+  } catch (err) {
+    // 任何意外都不该让面板崩掉
+    outputDir = null;
     box.classList.remove('ok');
     el.fileDirName.textContent = '未选择目录';
-    el.fileDirHint.textContent = '选一个本地文件夹，之后写入的文件都会放在那里';
+    el.fileDirHint.textContent = `状态读取失败：${err?.message || err}`;
   }
 }
 

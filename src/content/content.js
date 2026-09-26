@@ -534,7 +534,8 @@
             ? document.documentElement.scrollHeight
             : Number(action.amount) || window.innerHeight * 0.85;
       window.scrollBy({ top: amount, behavior: 'smooth' });
-      await sleep(450);
+      // 平滑滚动的动画约 250~300ms；450 是保守值，收到 300
+      await sleep(300);
       return {
         ok: true,
         moved: Math.round(window.scrollY - before),
@@ -546,6 +547,12 @@
       if (!action.url) return { ok: false, error: '缺少 url' };
       location.href = action.url;
       return { ok: true, navigating: action.url };
+    }
+
+    if (type === 'new_tab') {
+      // content script 无法自己开标签页（没有 tabs 权限的页面上下文），
+      // 这里只把请求回报给 background，由它调用 chrome.tabs.create。
+      return { ok: true, __openTab: action.url || 'about:blank' };
     }
 
     if (type === 'back') {
@@ -609,7 +616,8 @@
       el.dispatchEvent(
         new MouseEvent('mouseenter', { bubbles: false, cancelable: true, view: window, clientX: cx, clientY: cy }),
       );
-      await sleep(400); // 等菜单展开
+      // 等菜单展开：有 DOM 变化就立刻返回，最多 400ms
+      await waitForSettle(400, 100);
       hideCursorLater();
       return { ok: true, hovered: action.id, at: [Math.round(cx), Math.round(cy)] };
     }
@@ -875,7 +883,8 @@
             );
           }
           if (el.form) el.form.requestSubmit?.();
-          await sleep(600);
+          // 提交后等页面有反应就返回，不再固定等 600ms
+          await waitForSettle(600);
         }
         return { ok: true, typed: value };
       }
