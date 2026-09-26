@@ -17,15 +17,12 @@
 
 ## 快速开始
 
-```bash
-git clone https://github.com/zaolong15/Pumpkin-Star
-```
-
-1. 打开 `edge://extensions/`（Chrome 用 `chrome://extensions/`）
-2. 打开左下角 **开发人员模式**
-3. 点 **加载解压缩的扩展**，选择本目录
-4. 点工具栏图标（或按 `Alt+J`）打开侧边栏
-5. 点右上角 **设置**，填入 API Base URL、API Key、模型名
+1.下载压缩包，解压
+2. 打开 `edge://extensions/`（Chrome 用 `chrome://extensions/`）
+3. 打开左下角 **开发人员模式**
+4. 点 **加载解压缩的扩展**，选择本目录
+5. 点工具栏图标（或按 `Alt+J`）打开侧边栏
+6. 点右上角 **设置**，填入 API Base URL、API Key、模型名
 
 **兼容任何 OpenAI 接口协议的服务**：DeepSeek、OpenAI、通义千问、Kimi、本地 Ollama 等。
 Base URL 填域名即可，`/v1` 会自动补全。模型名可点「获取列表」自动读取。
