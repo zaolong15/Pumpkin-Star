@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pumpkin Star</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon" id="brandIcon" title="Pumpkin Star"></span>
+        <strong>Pumpkin Star</strong>
+        <span class="dot" id="statusDot" title="就绪"></span>
+      </div>
+      <div class="actions">
+        <button id="btnEvolve" class="icon-btn" title="技能与自我规则" aria-label="技能与规则">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
+            <circle cx="12" cy="12" r="3.5" />
+          </svg>
+        </button>
+        <button id="btnMemory" class="icon-btn" title="记忆库" aria-label="记忆库">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3 3 3 0 0 0 3-3V8a3 3 0 0 0-3-3Z" />
+            <path d="M9 8H7a3 3 0 0 0 0 6h2M15 8h2a3 3 0 0 1 0 6h-2" />
+          </svg>
+        </button>
+        <button id="btnUsage" class="icon-btn" title="用量与余额" aria-label="用量与余额">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 19V5M4 19h16" />
+            <path d="M8 19v-6M12 19V9M16 19v-4" />
+          </svg>
+        </button>
+        <button id="btnPage" class="icon-btn" title="查看当前页面信息" aria-label="页面信息">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button id="btnSettings" class="icon-btn" title="设置" aria-label="设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.1a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="chat" class="chat" aria-live="polite">
+      <div class="welcome">
+        <h1>你好，我是 Pumpkin Star</h1>
+        <p>看懂当前网页，然后点击、填表、翻译、总结、改造页面。</p>
+      </div>
+    </main>
+
+    <div id="steps" class="steps" hidden></div>
+
+    <footer class="composer">
+      <!-- 已附加的文件 -->
+      <div id="attachBar" class="attach-bar" hidden></div>
+
+      <div class="input-row">
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="告诉我做什么…（Enter 发送，Shift+Enter 换行）"
+        ></textarea>
+        <button id="btnAttach" class="compose-btn" title="附加本地文件" aria-label="附加文件">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L10 18a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
+          </svg>
+        </button>
+        <button id="btnClip" class="compose-btn" title="读取剪贴板作为上下文" aria-label="读剪贴板">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="3" width="8" height="4" rx="1" />
+            <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+          </svg>
+        </button>
+        <input type="file" id="fileInput" multiple hidden />
+        <button id="btnCancel" class="cancel-btn" title="停止当前任务（Esc）" aria-label="停止" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="7" width="10" height="10" rx="1.5" />
+          </svg>
+        </button>
+        <button id="btnSend" class="send" title="发送" aria-label="发送">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+      </div>
+      <div class="hint">
+        <div class="hint-left">
+          <span id="modelHint">未配置模型</span>
+        </div>
+        <div class="hint-right">
+          <span id="tokenHint" class="token-hint" title="本次会话累计 token"></span>
+          <button id="btnClear" class="link">清空对话</button>
+        </div>
+      </div>
+    </footer>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal" hidden>
+      <div class="modal-card">
+        <div class="tabs" id="settingsTabs">
+          <button class="tab active" data-tab="model">模型</button>
+          <button class="tab" data-tab="appearance">外观</button>
+          <button class="tab" data-tab="behavior">行为</button>
+        </div>
+
+        <!-- 模型 -->
+        <div class="tab-pane" data-pane="model">
+          <label>
+            <span>API Base URL</span>
+            <input id="sBaseUrl" type="text" placeholder="https://api.deepseek.com" />
+            <span class="field-hint">
+              填域名即可，<code>/v1</code> 会自动补上。带不带 <code>/v1</code> 都能识别。
+            </span>
+          </label>
+          <label>
+            <span>API Key</span>
+            <input id="sApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+          </label>
+          <label>
+            <span>模型</span>
+            <div class="input-with-btn">
+              <input id="sModel" type="text" list="modelList" placeholder="点击右侧获取，或手填" />
+              <button id="btnFetchModels" class="ghost small-btn" type="button">获取列表</button>
+            </div>
+            <datalist id="modelList"></datalist>
+            <span class="field-hint" id="modelListHint">
+              DeepSeek 常用 deepseek-chat（对话）与 deepseek-reasoner（推理）。
+            </span>
+          </label>
+          <div class="row">
+            <label class="half">
+              <span>温度</span>
+              <input id="sTemp" type="number" min="0" max="2" step="0.1" />
+            </label>
+            <label class="half">
+              <span>最大步数</span>
+              <input id="sSteps" type="number" min="1" max="30" step="1" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="half">
+              <span>输入单价（元/百万）</span>
+              <input id="sPriceIn" type="number" min="0" step="0.01" placeholder="2" />
+            </label>
+            <label class="half">
+              <span>输出单价（元/百万）</span>
+              <input id="sPriceOut" type="number" min="0" step="0.01" placeholder="8" />
+            </label>
+          </div>
+          <label>
+            <span>手动预算（元，用于没有余额接口的服务商）</span>
+            <input id="sBudget" type="number" min="0" step="0.01" placeholder="留空则不启用" />
+          </label>
+          <p class="tip">
+            兼容 OpenAI 接口的服务都可以：DeepSeek、OpenAI、通义千问、Kimi、本地 Ollama
+            （<code>http://localhost:11434/v1</code>）等。Key 仅保存在本机浏览器存储中。
+            <br />
+            余额：DeepSeek 可自动读取真实余额；其他服务商请在「手动预算」填一个总额，
+            插件会用「预算 − 累计消耗」估算剩余。
+          </p>
+        </div>
+
+        <!-- 外观 -->
+        <div class="tab-pane" data-pane="appearance" hidden>
+          <div class="field">
+            <span class="field-label">主题色</span>
+            <div class="swatches" id="accentSwatches"></div>
+            <div class="custom-color">
+              <input type="color" id="sAccentCustom" />
+              <input type="text" id="sAccentHex" class="hex" maxlength="7" spellcheck="false" />
+              <span class="tiny">自定义</span>
+            </div>
+            <p class="tip tight">
+              默认是中性灰阶（与 DeepSeek Harness 一致的克制配色）。选一个颜色后，
+              发送键、强调文字与选中态会跟着变。
+            </p>
+          </div>
+
+          <div class="field">
+            <span class="field-label">品牌图标</span>
+            <div class="icon-grid" id="brandIconGrid"></div>
+            <div class="icon-actions">
+              <label class="ghost small-btn file-btn">
+                上传图片
+                <input type="file" id="brandIconFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden />
+              </label>
+              <button id="brandIconClear" class="ghost small-btn" type="button">清除上传</button>
+            </div>
+            <label class="switch-row standalone compact">
+              <input type="checkbox" id="sApplyToolbar" />
+              <div>
+                <strong>同时应用到浏览器工具栏</strong>
+                <small>工具栏图标会跟着变（需要重新渲染，稍有延迟）</small>
+              </div>
+            </label>
+            <p class="tip tight" id="brandIconHint">选一个内置图标，或上传自己的图片。</p>
+          </div>
+
+          <div class="field">
+            <span class="field-label">深浅模式</span>
+            <div class="segmented" id="sMode">
+              <button data-value="system">跟随系统</button>
+              <button data-value="light">浅色</button>
+              <button data-value="dark">深色</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">玻璃效果</span>
+            <div class="segmented" id="sGlass">
+              <button data-value="tint">半透明</button>
+              <button data-value="off">不透明</button>
+            </div>
+            <p class="tip tight" id="glassHint"></p>
+          </div>
+
+          <div class="field">
+            <span class="field-label">圆角 <em id="radiusVal"></em></span>
+            <input type="range" id="sRadius" min="0" max="1" step="0.05" />
+          </div>
+
+          <div class="field">
+            <span class="field-label">界面密度</span>
+            <div class="segmented" id="sDensity">
+              <button data-value="compact">紧凑</button>
+              <button data-value="normal">标准</button>
+              <button data-value="relaxed">宽松</button>
+            </div>
+          </div>
+
+          <label class="switch-row standalone">
+            <input type="checkbox" id="sMotion" />
+            <div>
+              <strong>界面动效</strong>
+              <small>淡入与悬浮过渡效果</small>
+            </div>
+          </label>
+
+          <div class="preview-box">
+            <span class="preview-label">预览</span>
+            <div class="preview-card">
+              <div class="preview-dot"></div>
+              <div class="preview-lines">
+                <span></span><span class="short"></span>
+              </div>
+              <button class="preview-btn">按钮</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 行为 -->
+        <div class="tab-pane" data-pane="behavior" hidden>
+          <div class="switches">
+            <label class="switch-row">
+              <input type="checkbox" id="sMemory" />
+              <div>
+                <strong>启用本地记忆库</strong>
+                <small>记住你的偏好与站点操作经验，下次自动带上</small>
+              </div>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="sEvolution" />
+              <div>
+                <strong>自进化</strong>
+                <small>
+                  每次任务后自动复盘，把可复用的方法存成「技能」，把该注意的经验存成「自我规则」，
+                  下次同类任务自动用上。全部可在顶栏的进化面板里查看和修改。
+                </small>
+              </div>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="sEvolutionInject" />
+              <div>
+                <strong>把学到的内容注入任务</strong>
+                <small>关闭后仍会积累，但不会影响执行（便于对照效果）</small>
+              </div>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="sFileOutput" />
+              <div>
+                <strong>允许写入本地文件夹</strong>
+                <small>开启后可让 Agent 把结果写成文件存到你指定的目录。需要单独授权一次。</small>
+              </div>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="sFloating" />
+              <div>
+                <strong>显示页面悬浮窗</strong>
+                <small>网页右下角的小助手，可快捷下指令、一键撤销改动</small>
+              </div>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="sCdp" />
+              <div>
+                <strong>真实输入模式（CDP）</strong>
+                <small>
+                  用浏览器调试协议发送点击与按键，事件带 isTrusted 标记，能过部分风控网站。
+                  代价：需要额外授权，且页面顶部会出现「正在调试」横幅。默认关闭。
+                </small>
+              </div>
+            </label>
+          </div>
+          <p class="tip">
+            说明：浏览器扩展**无法移动你的系统鼠标或键盘** —— 没有这样的 API，
+            那是 pyautogui 一类本地程序才能做的事。这里的一切操作都是在页面内
+            派发事件来模拟的。少数风控严格的网站在默认模式下可能不响应，
+            这时可以试试打开「真实输入模式」。
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btnSettingsReset" class="ghost danger">恢复默认外观</button>
+          <button id="btnSettingsCancel" class="ghost">取消</button>
+          <button id="btnSettingsSave" class="primary">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 记忆库弹窗 -->
+    <div id="memoryModal" class="modal" hidden>
+      <div class="modal-card wide">
+        <h2>记忆库 <span id="memStats" class="stats"></span></h2>
+        <div class="mem-add">
+          <select id="memKind">
+            <option value="preference">偏好</option>
+            <option value="fact">事实</option>
+            <option value="site">站点经验</option>
+          </select>
+          <input id="memText" type="text" placeholder="例如：回答时先给结论，再给理由" />
+          <button id="memAddBtn" class="primary small">添加</button>
+        </div>
+        <div class="mem-filters">
+          <button class="filter active" data-kind="all">全部</button>
+          <button class="filter" data-kind="preference">偏好</button>
+          <button class="filter" data-kind="fact">事实</button>
+          <button class="filter" data-kind="site">站点经验</button>
+        </div>
+        <div id="memList" class="mem-list"></div>
+        <div class="modal-actions">
+          <button id="memClearAuto" class="ghost danger">清除自动记忆</button>
+          <button id="memClose" class="primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 进化：技能与规则 -->
+    <div id="evolveModal" class="modal" hidden>
+      <div class="modal-card wide">
+        <h2>技能与自我规则 <span id="evoStats" class="stats"></span></h2>
+
+        <div class="tabs" id="evoTabs">
+          <button class="tab active" data-evo="skills">技能</button>
+          <button class="tab" data-evo="rules">自我规则</button>
+        </div>
+
+        <!-- 技能 -->
+        <div class="evo-pane" data-evo-pane="skills">
+          <div class="evo-add">
+            <input id="skillName" type="text" placeholder="技能名，如：搜索结果提取" />
+            <input id="skillTrigger" type="text" placeholder="什么时候用，如：在搜索结果页提取条目" />
+          </div>
+          <textarea id="skillSteps" rows="2" placeholder="步骤，每行一步"></textarea>
+          <button id="skillAddBtn" class="primary small" type="button">添加技能</button>
+          <div id="skillList" class="evo-list"></div>
+        </div>
+
+        <!-- 规则 -->
+        <div class="evo-pane" data-evo-pane="rules" hidden>
+          <div class="evo-add">
+            <select id="ruleKind">
+              <option value="efficiency">效率</option>
+              <option value="reliability">可靠性</option>
+              <option value="preference">偏好</option>
+            </select>
+            <input id="ruleText" type="text" placeholder="一条自我提醒，如：能用 enter 提交就别多点一次按钮" />
+          </div>
+          <button id="ruleAddBtn" class="primary small" type="button">添加规则</button>
+          <div id="ruleList" class="evo-list"></div>
+        </div>
+
+        <p class="tip tight">
+          这些内容是 Agent 从自己的执行里总结的，你可以随时修改或删除。
+          规则只影响它的行为提示，不会让它获得新能力，也不能绕过安全底线。
+        </p>
+
+        <div class="modal-actions">
+          <button id="evoClearAuto" class="ghost danger">清除自动积累的</button>
+          <button id="evoClose" class="primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件输出弹窗 -->
+    <div id="fileModal" class="modal" hidden>
+      <div class="modal-card">
+        <h2>输出文件</h2>
+        <div class="file-dir" id="fileDirBox">
+          <div class="file-dir-info">
+            <strong id="fileDirName">未选择目录</strong>
+            <small id="fileDirHint">选一个本地文件夹，之后写入的文件都会放在那里</small>
+          </div>
+          <button id="fileChooseDir" class="ghost small-btn" type="button">选择目录</button>
+        </div>
+        <label>
+          <span>文件名</span>
+          <input id="fileName" type="text" placeholder="output.md" />
+        </label>
+        <label>
+          <span>格式</span>
+          <select id="fileFormat" class="full-select">
+            <option value="md">Markdown (.md)</option>
+            <option value="txt">纯文本 (.txt)</option>
+            <option value="json">JSON (.json)</option>
+            <option value="csv">CSV (.csv)</option>
+          </select>
+        </label>
+        <label>
+          <span>内容</span>
+          <textarea id="fileContent" rows="6" placeholder="要写入的内容，或让 AI 生成后自动填入"></textarea>
+        </label>
+        <p class="tip tight" id="fileHint"></p>
+        <div class="modal-actions">
+          <button id="fileDownload" class="ghost">直接下载</button>
+          <button id="fileForget" class="ghost danger">忘记目录</button>
+          <button id="fileSave" class="primary">写入文件夹</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用量与余额弹窗 -->
+    <div id="usageModal" class="modal" hidden>
+      <div class="modal-card wide">
+        <h2>用量与余额 <span id="uSource" class="stats"></span></h2>
+
+        <div class="usage-grid four">
+          <div class="usage-cell">
+            <small>账户余额</small>
+            <strong id="uBalance">—</strong>
+            <span id="uBalanceDetail"></span>
+          </div>
+          <div class="usage-cell">
+            <small>今日花费</small>
+            <strong id="uToday">—</strong>
+            <span id="uTodayDetail"></span>
+          </div>
+          <div class="usage-cell">
+            <small>本次会话</small>
+            <strong id="uSession">0</strong>
+            <span id="uSessionDetail"></span>
+          </div>
+          <div class="usage-cell">
+            <small>历史总计</small>
+            <strong id="uTotal">0</strong>
+            <span id="uTotalDetail"></span>
+          </div>
+        </div>
+
+        <div class="usage-prices" id="uPrices">
+          <span class="field-label">单价（元 / 百万 token）</span>
+          <div class="price-row">
+            <label>
+              <span>输入</span>
+              <input type="number" id="uPriceIn" min="0" step="0.01" placeholder="2" />
+            </label>
+            <label>
+              <span>输出</span>
+              <input type="number" id="uPriceOut" min="0" step="0.01" placeholder="8" />
+            </label>
+            <button id="uPriceSave" class="ghost small-btn">保存单价</button>
+          </div>
+          <p class="tip tight" id="uPriceHint"></p>
+        </div>
+
+        <h3 class="sec">最近任务</h3>
+        <div id="usageHistory" class="usage-history"></div>
+
+        <div class="modal-actions">
+          <button id="uRefresh" class="ghost">刷新余额</button>
+          <button id="uResetSession" class="ghost">重置会话计数</button>
+          <button id="uResetAll" class="ghost danger">全部清零</button>
+          <button id="uClose" class="primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
